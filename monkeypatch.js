@@ -123,14 +123,7 @@ window._mp = {
                     .then((resp) => {
                         if (!resp.ok) {
                             if (resp.status === 409) {
-                                // Too many requests. Try again in 10s
-                                console.log("[monkeypatch] Failed to sync due to a delay on Github. Trying again in " + (_mp.retryInterval / 1000).toFixed(2) + " seconds");
-                                setTimeout(() => {
-                                    console.log("[monkeypatch] Trying again..");
-                                    // Retry slower each time
-                                    _mp.retryInterval = _mp.retryInterval * 1.5;
-                                    _mp.sync()
-                                }, _mp.retryInterval);
+                                // Too many requests. Try again next time.
                                 return;
                             }
                             throw new Error("Error saving to Github: " + resp.status + " " + resp.statusText);
