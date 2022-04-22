@@ -65,10 +65,6 @@ window._mp = {
         window._mp.observer = new MutationObserver(function () {
             // Run this code on any change to the DOM
             // Throttle to save at most once every 1s
-            const now = Number(new Date());
-            if (now - _mp.lastSave < 1000) {
-                return;
-            }
             const contents = document.documentElement.innerHTML;
             if (_mp.contents === contents) {
                 // No changes
@@ -79,8 +75,8 @@ window._mp = {
                 _mp.contents = contents;
                 return;
             }
+            _mp.lastChange = Number(new Date());
             _mp.contents = contents;
-            _mp.sync();
         });
         // Listen for all changes to any nodes
         // Warning: this is probably memory intensive (an alternative would be to use polling)
@@ -90,6 +86,12 @@ window._mp = {
             subtree: true,
             characterData: true,
         });
+        // Check for saves every 3s
+        setInterval(() => {
+            if (_mp.lastChange > _mp.lastSave) {
+                _mp.sync();
+            }
+        }, _mp.saveInterval);
     },
     sync: function (cb) {
         // Sync _mp.contents to Github using the cached config
@@ -150,7 +152,8 @@ window._mp = {
     observer: null,
     contents: null,
     lastSave: 0,
-    retryInterval: 5000,
+    lastChange: 0,
+    saveInterval: 3000,
 };
 
 // Stuff to run immediately
