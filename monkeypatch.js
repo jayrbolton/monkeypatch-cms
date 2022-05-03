@@ -99,7 +99,12 @@ window._mp = {
         const repo = localStorage.getItem("repoName");
         const path = localStorage.getItem("filePath");
         const baseURL = "https://api.github.com/repos/" + owner + "/" + repo
-        window.fetch(baseURL + "/contents/" + path)
+        const fetchOptions = {
+            headers: {
+                Authorization: "Bearer " + localStorage.getItem("token"),
+            }
+        };
+        window.fetch(baseURL + "/contents/" + path, fetchOptions)
             .then((resp) => resp.json()).then((resp) => {
                 if (resp.type !== "file") {
                     throw new Error("File located at '" + owner + "/" + repo + "/" + path + "' is not a file");
