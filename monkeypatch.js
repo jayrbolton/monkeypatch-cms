@@ -1,7 +1,7 @@
 window._mp = {
     // Initialize and validate all our configuration data, saving it to localStorage
     init: function (repoURL, branchName, filePath, token) {
-        if (repoURL === undefined) {
+        if (!repoURL) {
             repoURL = prompt("Enter the URL of your github repository (example: 'https://github.com/userOrOrg/repoName')");
         }
         // Validate the repoURL
@@ -17,15 +17,15 @@ window._mp = {
         }
         const userOrg = pathPieces[1];
         const repoName = pathPieces[2];
-        if (branchName === undefined) {
+        if (!branchName) {
             branchName = prompt("Enter the branch name of your repo (leave blank for 'main')");
-            if (branchName === "") {
+            if (branchName === "" || branchName === null) {
                 branchName = "main";
             }
         }
-        if (filePath === undefined) {
+        if (!filePath) {
             filePath = prompt("Enter the HTML file path for this webpage in your repo (leave blank for 'index.html')");
-            if (filePath === "") {
+            if (filePath === "" || filePath === null) {
                 filePath = "index.html";
             }
             // Strip any leading slash
@@ -33,18 +33,20 @@ window._mp = {
                 filePath = filePath.slice(1);
             }
         }
-        if (token === undefined) {
-            token = prompt("Enter a Github Personal Access Token that can write to branch name of your repo (leave blank for 'main')");
-            if (token === "") {
+        if (!token) {
+            token = prompt("Enter a Github Personal Access Token that can write to branch name of your repo");
+            if (token === "" || !token) {
                 console.error("[monkeypatch] No token entered; cannot continue.");
                 return;
             }
         }
-        localStorage.setItem("userOrg", userOrg);
-        localStorage.setItem("repoName", repoName);
-        localStorage.setItem("branchName", branchName);
-        localStorage.setItem("filePath", filePath);
-        localStorage.setItem("token", token);
+        localStorage.setItem(_mp.cacheKey, JSON.stringify({
+          userOrg: userOrg,
+          repoName: repoName,
+          branchName: branchName,
+          filePath: filePath,
+          token: token,
+        }));
         window._mp.contents = document.documentElement.innerHTML;
         window._mp.connect();
     },
@@ -52,11 +54,7 @@ window._mp = {
     clear: function () {
         window._mp.observer.disconnect();
         window._mp.observer = null;
-        localStorage.removeItem("userOrg");
-        localStorage.removeItem("repoName");
-        localStorage.removeItem("branchName");
-        localStorage.removeItem("filePath");
-        localStorage.removeItem("token");
+        localStorage.removeItem(_mp.cacheKey);
         console.log("[monkeypatch] All configuration data cleared.");
     },
     // Connect to github and start auto-saving changes to the DOM
@@ -95,14 +93,22 @@ window._mp = {
     },
     sync: function (cb) {
         // Sync _mp.contents to Github using the cached config
-        const owner = localStorage.getItem("userOrg");
-        const repo = localStorage.getItem("repoName");
-        const path = localStorage.getItem("filePath");
+        let cache;
+        try {
+          cache = JSON.parse(localStorage.getItem(_mp.cacheKey));
+        } catch (e) {
+          console.error(`Could not load monkeypatch config: ${e}`);
+          console.error(`Run localStorage.clearItem(${_mp.cacheKey}) and reload.`);
+          throw e;
+        }
+        const owner = cache.userOrg;
+        const repo = cache.repoName;
+        const path = cache.filePath;
         const baseURL = "https://api.github.com/repos/" + owner + "/" + repo
         const fetchOptions = {
             headers: {
-                Authorization: "Bearer " + localStorage.getItem("token"),
-            }
+              Authorization: "Bearer " + cache.token
+            },
         };
         window.fetch(baseURL + "/contents/" + path, fetchOptions)
             .then((resp) => resp.json()).then((resp) => {
@@ -118,7 +124,7 @@ window._mp = {
                 const request = {
                     method: "PUT",
                     headers: {
-                        Authorization: "Bearer " + localStorage.getItem("token"),
+                        Authorization: "Bearer " + cache.token,
                         "Content-Type": "application/json",
                         "Accept": "application/vnd.github.v3+json",
                     },
@@ -152,11 +158,12 @@ window._mp = {
     lastSave: 0,
     lastChange: 0,
     saveInterval: 3000,
+    cacheKey: "_monkeypatch_" + window.location.pathname,
 };
 
 // Stuff to run immediately
 (function() {
-    if (localStorage.userOrg && localStorage.repoName && localStorage.branchName && localStorage.filePath && localStorage.token) {
+    if (localStorage[_mp.cacheKey]) {
         console.log("[monkeypatch] Found existing config data. Run `_mp.init()` to reset and `_mp.clear()` to remove config.");
         window._mp.connect();
     } else {
